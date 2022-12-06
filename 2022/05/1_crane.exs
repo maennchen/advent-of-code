@@ -1,23 +1,24 @@
 #!/usr/bin/env elixir
 
-move_regex = ~r/^move (?<count>\d+) from (?<from>\d+) to (?<to>\d+)$/
+read_stack_line = fn line, layers ->
+  layer =
+    line
+    |> String.codepoints()
+    |> Enum.chunk_every(4)
+    |> Enum.map(&Enum.at(&1, 1))
+    |> Enum.map(fn
+      " " -> nil
+      crate -> crate
+    end)
 
-read_stack_line = fn line, stacks ->
-  line
-  |> String.codepoints()
-  |> Enum.chunk_every(4)
-  |> Enum.map(&Enum.at(&1, 1))
-  |> Enum.map(fn
-    " " -> nil
-    crate -> crate
-  end)
-  |> Enum.with_index()
-  |> Enum.reduce(stacks, fn
-    {nil, _stack_index}, stacks ->
-      stacks
+  [layer | layers]
+end
 
-    {crate, stack_index}, stacks ->
-      update_in(stacks, [Access.at!(stack_index)], &(&1 ++ [crate]))
+finalize_stack = fn layers ->
+  layers
+  |> Enum.reverse()
+  |> Enum.zip_with(fn stack ->
+    Enum.reject(stack, &is_nil/1)
   end)
 end
 
@@ -32,23 +33,21 @@ end
 
 IO.stream()
 |> Stream.map(&String.trim_trailing(&1, "\n"))
-|> Enum.reduce([[], [], [], [], [], [], [], [], []], fn
+|> Enum.reduce([], fn
   line, stacks ->
     cond do
       match?("[" <> _rest, String.trim(line)) ->
         read_stack_line.(line, stacks)
 
       match?(" 1 " <> _rest, line) ->
-        stacks
+        finalize_stack.(stacks)
 
       match?("", line) ->
         stacks
 
       match?("move" <> _rest, line) ->
-        %{"count" => count, "from" => from, "to" => to} =
-          move_regex
-          |> Regex.named_captures(line)
-          |> Map.new(&{elem(&1, 0), String.to_integer(elem(&1, 1))})
+        [count, from, to] =
+          ~r/\d+/ |> Regex.scan(line) |> List.flatten() |> Enum.map(&String.to_integer/1)
 
         Enum.reduce(1..count, stacks, move_crate.(from, to))
     end
