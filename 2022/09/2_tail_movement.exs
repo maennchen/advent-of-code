@@ -38,16 +38,11 @@ end
   |> Enum.reduce(
     {List.duplicate({0, 0}, 10), MapSet.new([{0, 0}])},
     fn head_movement, {[head_position | tail_positions], tail_route} ->
-      new_positions =
-        tail_positions
-        |> Enum.reduce(
-          [add.(head_position, head_movement)],
-          fn tail_position, [predecessor_position | _] = acc ->
-            new_pos = follow.(predecessor_position, tail_position)
-            [new_pos | acc]
-          end
-        )
-        |> Enum.reverse()
+      new_head_position = add.(head_position, head_movement)
+
+      new_positions = [
+        new_head_position | Enum.scan(tail_positions, new_head_position, &follow.(&2, &1))
+      ]
 
       {new_positions, MapSet.put(tail_route, List.last(new_positions))}
     end
