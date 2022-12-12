@@ -37,7 +37,7 @@ visible_score_from_tree_house = fn row_index, column_index, tree ->
       1
     )
   end)
-  |> Enum.reduce(&(&1 * &2))
+  |> Enum.product()
 end
 
 count =
