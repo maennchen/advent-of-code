@@ -1,5 +1,7 @@
 #!/usr/bin/env elixir
 
+Code.require_file("./graph.exs", Path.dirname(__ENV__.file))
+
 {heights, _start_position, end_position} =
   IO.stream()
   |> Enum.with_index()
@@ -33,31 +35,29 @@
     {Map.merge(acc, Map.new(heights)), start_position, end_position}
   end)
 
-graph = :digraph.new()
-
-for {index, _height} <- heights do
-  :digraph.add_vertex(graph, index)
-end
-
-for {{row_index, column_index} = start_index, start_height} <- heights,
-    search_index <- [
-      {row_index, column_index - 1},
-      {row_index, column_index + 1},
-      {row_index - 1, column_index},
-      {row_index + 1, column_index}
-    ],
-    Map.has_key?(heights, search_index),
-    search_height = Map.fetch!(heights, search_index),
-    search_height <= start_height + 1 do
-  :digraph.add_edge(graph, start_index, search_index)
-end
-
-shortest_hike_path =
+possible_start_positions =
   heights
   |> Enum.filter(&match?({_index, 0}, &1))
   |> Enum.map(&elem(&1, 0))
-  |> Enum.map(&:digraph.get_short_path(graph, &1, end_position))
-  |> Enum.reject(&match?(false, &1))
-  |> Enum.min_by(&length/1)
 
-IO.puts(length(shortest_hike_path) - 1)
+heights
+|> Map.keys()
+|> Graph.new(
+  for {{row_index, column_index} = start_index, start_height} <- heights,
+      search_index <- [
+        {row_index, column_index - 1},
+        {row_index, column_index + 1},
+        {row_index - 1, column_index},
+        {row_index + 1, column_index}
+      ],
+      Map.has_key?(heights, search_index),
+      search_height = Map.fetch!(heights, search_index),
+      search_height <= start_height + 1,
+      reduce: %{} do
+    acc -> Map.update(acc, search_index, [start_index], &[start_index | &1])
+  end
+)
+|> Graph.dijkstra_all(end_position, possible_start_positions)
+|> Enum.reject(&match?(:no_path, &1))
+|> Enum.min()
+|> IO.puts()
